@@ -1,93 +1,150 @@
-// Simple Snake Game Engine
+// Snake Game Engine - Fixed Version
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
+const startBtn = document.getElementById('startBtn');
+const scoreDisplay = document.getElementById('score');
 
-// Set up game parameters
+// Game parameters
 const box = 20;
 const canvasSize = 400;
+const gridSize = canvasSize / box;
+
 let snake = [{x: 9 * box, y: 9 * box}];
-let direction;
-let food = { x: Math.floor(Math.random() * (canvasSize/box)) * box, y: Math.floor(Math.random() * (canvasSize/box)) * box };
+let direction = 'RIGHT';
+let nextDirection = 'RIGHT';
+let food = generateFood();
 let score = 0;
+let gameActive = false;
+let gameLoopId = null;
 
-// Control the snake
-document.addEventListener('keydown', directionControl);
-
-function directionControl(event) {
-    if (event.keyCode == 37 && direction != 'RIGHT') {
-        direction = 'LEFT';
-    } else if (event.keyCode == 38 && direction != 'DOWN') {
-        direction = 'UP';
-    } else if (event.keyCode == 39 && direction != 'LEFT') {
-        direction = 'RIGHT';
-    } else if (event.keyCode == 40 && direction != 'UP') {
-        direction = 'DOWN';
-    }
+// Generate random food position
+function generateFood() {
+    return {
+        x: Math.floor(Math.random() * gridSize) * box,
+        y: Math.floor(Math.random() * gridSize) * box
+    };
 }
 
-// Draw everything on the canvas
-function draw() {
-    ctx.clearRect(0, 0, canvasSize, canvasSize);
+// Handle keyboard input
+document.addEventListener('keydown', function(event) {
+    if (!gameActive) return;
+    
+    if (event.keyCode === 37 && direction !== 'RIGHT') nextDirection = 'LEFT';
+    if (event.keyCode === 38 && direction !== 'DOWN') nextDirection = 'UP';
+    if (event.keyCode === 39 && direction !== 'LEFT') nextDirection = 'RIGHT';
+    if (event.keyCode === 40 && direction !== 'UP') nextDirection = 'DOWN';
+});
 
-    for (let i = 0; i < snake.length; i++) {
-        ctx.fillStyle = (i === 0) ? 'green' : 'lightgreen';
-        ctx.fillRect(snake[i].x, snake[i].y, box, box);
-        ctx.strokeStyle = 'darkgreen';
-        ctx.strokeRect(snake[i].x, snake[i].y, box, box);
+// Start button click handler
+startBtn.addEventListener('click', function() {
+    if (!gameActive) {
+        gameActive = true;
+        startBtn.textContent = 'Stop Game';
+        gameLoop();
+    } else {
+        gameActive = false;
+        clearInterval(gameLoopId);
+        startBtn.textContent = 'Start Game';
     }
+});
 
-    ctx.fillStyle = 'red';
-    ctx.fillRect(food.x, food.y, box, box);
+// Main game loop
+function gameLoop() {
+    if (!gameActive) return;
+    
+    update();
+    draw();
+    
+    gameLoopId = setTimeout(gameLoop, 100);
+}
 
-    // Old head position
+// Update game state
+function update() {
+    direction = nextDirection;
+    
     let snakeX = snake[0].x;
     let snakeY = snake[0].y;
-
-    // Determine snake's movement direction
-    if (direction == 'LEFT') snakeX -= box;
-    if (direction == 'UP') snakeY -= box;
-    if (direction == 'RIGHT') snakeX += box;
-    if (direction == 'DOWN') snakeY += box;
-
-    // Check if snake has eaten the food
-    if (snakeX == food.x && snakeY == food.y) {
-        score++; 
-        food = {
-            x: Math.floor(Math.random() * (canvasSize/box)) * box,
-            y: Math.floor(Math.random() * (canvasSize/box)) * box
-        };
-    } else {
-        // Remove the tail of the snake
-        snake.pop();
+    
+    if (direction === 'LEFT') snakeX -= box;
+    if (direction === 'UP') snakeY -= box;
+    if (direction === 'RIGHT') snakeX += box;
+    if (direction === 'DOWN') snakeY += box;
+    
+    // Check wall collision
+    if (snakeX < 0 || snakeY < 0 || snakeX >= canvasSize || snakeY >= canvasSize) {
+        gameOver();
+        return;
     }
-
-    // Add new head
-    let newHead = { x: snakeX, y: snakeY }; 
-
-    // Game over conditions
-    if (snakeX < 0 || snakeY < 0 || snakeX >= canvasSize || snakeY >= canvasSize || collision(newHead, snake)) {
-        clearInterval(game);
-        alert('Game Over!');
-        document.location.reload();
-    }
-    snake.unshift(newHead);
-
-    // Update score
-    ctx.fillStyle = 'black';
-    ctx.font = '20px Arial';
-    ctx.fillText('Score: ' + score, box, box);
-}
-
-// Check collision
-function collision(head, array) {
-    for (let i = 0; i < array.length; i++) {
-        if (head.x == array[i].x && head.y == array[i].y) {
-            return true;
+    
+    // Check self collision
+    for (let i = 0; i < snake.length; i++) {
+        if (snakeX === snake[i].x && snakeY === snake[i].y) {
+            gameOver();
+            return;
         }
     }
-    return false;
+    
+    snake.unshift({x: snakeX, y: snakeY});
+    
+    // Check food collision
+    if (snakeX === food.x && snakeY === food.y) {
+        score += 10;
+        scoreDisplay.textContent = 'Score: ' + score;
+        food = generateFood();
+    } else {
+        snake.pop();
+    }
 }
 
-// Set game loop speed
-let game = setInterval(draw, 100);
+// Draw game
+function draw() {
+    // Clear canvas
+    ctx.fillStyle = '#c0de59';
+    ctx.fillRect(0, 0, canvasSize, canvasSize);
+    
+    // Draw grid
+    ctx.strokeStyle = '#a0b840';
+    ctx.lineWidth = 0.5;
+    for (let i = 0; i <= gridSize; i++) {
+        ctx.beginPath();
+        ctx.moveTo(i * box, 0);
+        ctx.lineTo(i * box, canvasSize);
+        ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.moveTo(0, i * box);
+        ctx.lineTo(canvasSize, i * box);
+        ctx.stroke();
+    }
+    
+    // Draw snake
+    for (let i = 0; i < snake.length; i++) {
+        ctx.fillStyle = i === 0 ? '#1a3a1a' : '#2d5a2d';
+        ctx.fillRect(snake[i].x + 1, snake[i].y + 1, box - 2, box - 2);
+    }
+    
+    // Draw food
+    ctx.fillStyle = '#ff3333';
+    ctx.fillRect(food.x + 1, food.y + 1, box - 2, box - 2);
+}
+
+// Game over
+function gameOver() {
+    gameActive = false;
+    clearInterval(gameLoopId);
+    startBtn.textContent = 'Start Game';
+    alert('Game Over! Final Score: ' + score + '\n\nClick Start Game to play again!');
+    
+    // Reset game
+    snake = [{x: 9 * box, y: 9 * box}];
+    direction = 'RIGHT';
+    nextDirection = 'RIGHT';
+    food = generateFood();
+    score = 0;
+    scoreDisplay.textContent = 'Score: 0';
+    draw();
+}
+
+// Initial draw
+draw();
